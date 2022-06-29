@@ -1,25 +1,30 @@
 package sample;
 
 import javafx.application.Application;
-import javafx.event.ActionEvent;
+import javafx.application.Platform;
 import javafx.event.EventHandler;
-import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.Cell;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+
+import java.io.IOException;
+import java.util.Optional;
 
 public class Main extends Application {
 
@@ -30,14 +35,16 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage) throws Exception {
         //Parent root = FXMLLoader.load(getClass().getResource("sample.fxml"));
-        primaryStage.setTitle("2048单机");
-        primaryStage.getIcons().add(new Image("file:C:\\Users\\WoodCube\\IdeaProjects\\JavaFX\\image\\logo1.png"));
+        primaryStage.setTitle("2048");
+        primaryStage.getIcons().add(new Image("images/logo1.png"));
 
-        int[] nums = {0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0};
-        int[] nums1 = {0, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        int[] nums2 = {0, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0};
-        int[] nums3 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 0};
-        int[] nums4 = {0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0, 0};
+        BestScore bestScore = new BestScore();
+        //int score = 0;
+
+        GameLogic game = new GameLogic();
+        game.randomChange();
+        //game.showState();
+
         //16个位置的控件
         //
         Text numShow0 = new Text();
@@ -105,17 +112,17 @@ public class Main extends Application {
         bestScoreBox.setPrefSize(100, 200);
         bestScoreBox.setStyle("-fx-background-color: #BBADA0; -fx-background-radius: 5;");
         bestScoreBox.setSpacing(5);
-        //Text................................................
+        //Text.......................................................................................................
         Text bestScoreTitle = new Text("最高分");
         bestScoreTitle.setFont(Font.font(25));
         bestScoreTitle.setFill(Color.rgb(238, 228, 218));
-        //Text................................................
-        Text bestScore = new Text("2000");
-        bestScore.setFont(Font.font(25));
-        bestScore.setFill(Color.WHITE);
+        //Text..........................................................................................................
+        Text bestScoreShow = new Text(bestScore.getBestScore());
+        bestScoreShow.setFont(Font.font(25));
+        bestScoreShow.setFill(Color.WHITE);
         //
         bestScoreBox.getChildren().add(bestScoreTitle);
-        bestScoreBox.getChildren().add(bestScore);
+        bestScoreBox.getChildren().add(bestScoreShow);
 
         //1.2 VBox（当前得分）--------------------------------------------
         VBox scoreBox = new VBox();
@@ -128,12 +135,12 @@ public class Main extends Application {
         scoreTitle.setFont(Font.font(25));
         scoreTitle.setFill(Color.rgb(238, 228, 218));
         //Text................................................
-        Text score = new Text("20");
-        score.setFont(Font.font(25));
-        score.setFill(Color.WHITE);
+        Text scoreShow = new Text("0");
+        scoreShow.setFont(Font.font(25));
+        scoreShow.setFill(Color.WHITE);
         //
         scoreBox.getChildren().add(scoreTitle);
-        scoreBox.getChildren().add(score);
+        scoreBox.getChildren().add(scoreShow);
 
         //
         paneTop.getChildren().add(bestScoreBox);
@@ -151,14 +158,8 @@ public class Main extends Application {
         paneMid.setVgap(10);
         paneMid.setAlignment(Pos.CENTER);
         paneMid.setStyle("-fx-background-color: #BBADA0; -fx-background-radius: 5;");
-        paneMid.setOnKeyPressed(new EventHandler<KeyEvent>() {
-            @Override
-            public void handle(KeyEvent event) {
-
-            }
-        });
         //16个HBox--------------------------------------------
-        reloadBlocks(nums, numShowArray, blockArray);
+        reloadBlocks(game.str, numShowArray, blockArray);
         for (int i = 0; i < 16; i++) {
             //根据当前位置数字设置样式
             blockArray[i].getChildren().add(numShowArray[i]);
@@ -176,12 +177,12 @@ public class Main extends Application {
         Button newGame = new Button("重新开始");
         newGame.setFont(Font.font(25));
         newGame.setTextFill(Color.rgb(249, 246, 242));
-        newGame.setStyle("-fx-background-color: #8F7A66;");
+        newGame.setStyle("-fx-background-color: #8F7A66; -fx-background-radius: 10;");
         //点击按钮事件
         newGame.setOnMouseClicked(new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
-                reloadBlocks(nums, numShowArray, blockArray);
+                newGame(scoreShow, game, numShowArray, blockArray);
             }
         });
         //
@@ -193,6 +194,54 @@ public class Main extends Application {
         anchorPane.getChildren().add(paneMid);
         anchorPane.getChildren().add(paneBottom);
 
+        //成功和失败提示弹窗++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        Stage tipsStage = new Stage();
+        VBox tipsRoot = new VBox();
+        tipsRoot.setStyle("-fx-background-color: #ffffffe6; -fx-background-radius: 10;");
+        tipsRoot.setAlignment(Pos.CENTER);
+
+        VBox tipsTop = new VBox();
+        tipsTop.setAlignment(Pos.CENTER);
+        tipsTop.setPrefSize(300, 100);
+
+        Label tipsText = new Label();
+        tipsText.setFont(Font.font(25));
+        tipsText.setTextFill(Color.rgb(119, 110, 101));
+        //text.setFill(Color.rgb(238, 228, 218));
+
+        HBox tipsScoreBox = new HBox();
+        tipsScoreBox.setAlignment(Pos.CENTER);
+        tipsScoreBox.setSpacing(10);
+        tipsScoreBox.setPrefSize(300, 80);
+
+        Label tipsScoreText = new Label("得分：");
+        tipsScoreText.setFont(Font.font(25));
+        Label tipsScore = new Label("0");
+        tipsScore.setFont(Font.font(25));
+        tipsScoreBox.getChildren().addAll(tipsScoreText, tipsScore);
+        //top.getChildren().addAll(text,scoreBox);
+        tipsTop.getChildren().addAll(tipsText);
+        Button tipsButton = new Button("重新开始");
+        tipsButton.setFont(Font.font(25));
+        tipsButton.setTextFill(Color.rgb(249, 246, 242));
+        tipsButton.setStyle("-fx-background-color: #8F7A66; -fx-background-radius: 10;");
+        tipsButton.setOnMouseClicked(event -> {
+            tipsStage.close();
+        });
+
+        tipsRoot.getChildren().addAll(tipsTop, tipsButton);
+
+        Scene tipsScene = new Scene(tipsRoot, 300, 200);
+
+        //stage和scene透明设置
+        tipsStage.initStyle(StageStyle.TRANSPARENT);
+        tipsScene.setFill(Paint.valueOf("#ffffff00"));
+
+        tipsStage.setScene(tipsScene);
+        tipsStage.initModality(Modality.APPLICATION_MODAL);//模态，点开一个窗口后只可在当前窗口操作
+        tipsStage.initStyle(StageStyle.TRANSPARENT);//没有  - ▢  ╳
+        //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
         Scene scene = new Scene(anchorPane, 470, 650);
 
         //监听键盘
@@ -200,27 +249,111 @@ public class Main extends Application {
             @Override
             public void handle(KeyEvent event) {
                 if (event.getCode() == KeyCode.W || event.getCode() == KeyCode.UP) {
-                    reloadBlocks(nums1, numShowArray, blockArray);
+                    try {
+                        gameJudge(bestScoreShow, bestScore, scoreShow, "w", game, numShowArray, blockArray, tipsText, tipsStage);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
                 if (event.getCode() == KeyCode.A || event.getCode() == KeyCode.LEFT) {
-                    reloadBlocks(nums2, numShowArray, blockArray);
+                    try {
+                        gameJudge(bestScoreShow, bestScore, scoreShow, "a", game, numShowArray, blockArray, tipsText, tipsStage);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
                 if (event.getCode() == KeyCode.S || event.getCode() == KeyCode.DOWN) {
-                    reloadBlocks(nums3, numShowArray, blockArray);
+                    try {
+                        gameJudge(bestScoreShow, bestScore, scoreShow, "s", game, numShowArray, blockArray, tipsText, tipsStage);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
                 if (event.getCode() == KeyCode.D || event.getCode() == KeyCode.RIGHT) {
-                    reloadBlocks(nums4, numShowArray, blockArray);
+                    try {
+                        gameJudge(bestScoreShow, bestScore, scoreShow, "d", game, numShowArray, blockArray, tipsText, tipsStage);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
-                if (event.getCode() == KeyCode.R) {
-                    reloadBlocks(nums, numShowArray, blockArray);
-                }
+//                if (event.getCode() == KeyCode.R) {
+//                    //重新开始
+//                    newGame(game, numShowArray, blockArray);
+//                }
             }
         });
 
         primaryStage.setScene(scene);
+
+        //取消操作系统默认退出事件
+        Platform.setImplicitExit(false);
+        primaryStage.setOnCloseRequest(event -> {
+            //取消右上角的 × 关闭窗口事件
+            event.consume();
+
+            //创建一个弹窗
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("退出程序");
+            alert.setHeaderText(null);
+            alert.setContentText("确定退出游戏？");
+
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.get() == ButtonType.OK) {
+                //退出程序
+                Platform.exit();
+                //关闭窗口，不退出程序
+                primaryStage.close();
+            }
+        });
         primaryStage.show();
     }
 
+    //按下键盘移动键进行移动，成功或失败时弹出窗口
+    private void gameJudge(Text bestScoreShow, BestScore bestScore, Text scoreShow, String wasd, GameLogic game, Text[] numShowArray, HBox[] blockArray, Label tipsText, Stage tipsStage) throws IOException {
+        game.wasd = wasd;
+        game.run();
+        reloadBlocks(game.str, numShowArray, blockArray);
+        //刷新分数
+        scoreShow.setText(String.valueOf(game.scoreNow()));
+        if (game.isVictory) {
+            game.isVictory = false;
+            tipsText.setText("恭喜你，成功啦！");
+            tipsStage.showAndWait();
+            int bestScoreInt = Integer.parseInt(bestScore.getBestScore());
+            if (game.scoreNow()>bestScoreInt){
+                String sn = String.valueOf(game.scoreNow());
+                bestScore.setBestScore(sn);
+                bestScoreShow.setText(sn);
+            }
+            newGame(scoreShow, game, numShowArray, blockArray);
+        }
+        if (game.isDefeat) {
+            game.isDefeat = false;
+            tipsText.setText("很遗憾，游戏失败！");
+            tipsStage.showAndWait();
+            int bestScoreInt = Integer.parseInt(bestScore.getBestScore());
+            if (game.scoreNow()>bestScoreInt){
+                String sn = String.valueOf(game.scoreNow());
+                bestScore.setBestScore(sn);
+                bestScoreShow.setText(sn);
+            }
+            newGame(scoreShow, game, numShowArray, blockArray);
+        }
+    }
+
+    //重新开始
+    private void newGame(Text scoreShow, GameLogic game, Text[] numShowArray, HBox[] blockArray) {
+        scoreShow.setText("0");
+//        game.score = 0;
+        for (int i = 0; i < 16; i++) {
+            game.str[i] = 0;
+        }
+        game.randomChange();
+        //game.showState();
+        reloadBlocks(game.str, numShowArray, blockArray);
+    }
+
+    //刷新字块
     private void reloadBlocks(int[] nums, Text[] numShowArray, HBox[] blockArray) {
         for (int i = 0; i < 16; i++) {
             //根据当前位置数字设置样式
